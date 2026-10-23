@@ -2,14 +2,12 @@
 const mongoose = require("mongoose");
 const Routine = require("../models/Routine");
 
-// Get all routine activities belonging to the logged-in user
+// Get the logged-in user's routine activities
 exports.getRoutines = async (req, res) => {
   try {
     const routines = await Routine.find({
       user: req.user.id
-    }).sort({
-      startTime: 1
-    });
+    }).sort({ startTime: 1 });
 
     res.status(200).json(routines);
   } catch (error) {
@@ -17,24 +15,25 @@ exports.getRoutines = async (req, res) => {
   }
 };
 
-// Add a routine activity for the logged-in user
+// Create a routine activity
 exports.createRoutine = async (req, res) => {
   try {
     const { title } = req.body;
 
-    if (!title || typeof title !== "string" || !title.trim()) {
+    if (typeof title !== "string" || !title.trim()) {
       return res.status(400).json({
         message: "Routine title is required."
       });
     }
 
     const routine = await Routine.create({
+      user: req.user.id,
       title: title.trim(),
-      description: req.body.description || "",
       startTime: req.body.startTime || "",
       endTime: req.body.endTime || "",
-      days: req.body.days || [],
-      user: req.user.id
+      category: req.body.category || "personal",
+      completed: req.body.completed ?? false,
+      day: req.body.day || "everyday"
     });
 
     res.status(201).json(routine);
@@ -43,7 +42,7 @@ exports.createRoutine = async (req, res) => {
   }
 };
 
-// Update a routine activity belonging to the logged-in user
+// Update only the logged-in user's routine activity
 exports.updateRoutine = async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
@@ -54,31 +53,32 @@ exports.updateRoutine = async (req, res) => {
 
     const allowedFields = [
       "title",
-      "description",
       "startTime",
       "endTime",
-      "days"
+      "category",
+      "completed",
+      "day"
     ];
 
-    const changes = {};
+    const updates = {};
 
-    allowedFields.forEach((field) => {
+    for (const field of allowedFields) {
       if (req.body[field] !== undefined) {
-        changes[field] = req.body[field];
+        updates[field] = req.body[field];
       }
-    });
-
-    if (
-      changes.title !== undefined &&
-      (typeof changes.title !== "string" || !changes.title.trim())
-    ) {
-      return res.status(400).json({
-        message: "Routine title is required."
-      });
     }
 
-    if (changes.title !== undefined) {
-      changes.title = changes.title.trim();
+    if (updates.title !== undefined) {
+      if (
+        typeof updates.title !== "string" ||
+        !updates.title.trim()
+      ) {
+        return res.status(400).json({
+          message: "Routine title is required."
+        });
+      }
+
+      updates.title = updates.title.trim();
     }
 
     const routine = await Routine.findOneAndUpdate(
@@ -86,11 +86,8 @@ exports.updateRoutine = async (req, res) => {
         _id: req.params.id,
         user: req.user.id
       },
-      changes,
-      {
-        new: true,
-        runValidators: true
-      }
+      { $set: updates },
+      { new: true, runValidators: true }
     );
 
     if (!routine) {
@@ -105,7 +102,7 @@ exports.updateRoutine = async (req, res) => {
   }
 };
 
-// Delete a routine activity belonging to the logged-in user
+// Delete only the logged-in user's routine activity
 exports.deleteRoutine = async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {

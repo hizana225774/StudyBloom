@@ -2,6 +2,8 @@
 import { useState } from "react";
 import "./App.css";
 
+import { login, register, logout } from "./api.js";
+
 import Header from "./components/Header.jsx";
 import Sidebar from "./components/Sidebar.jsx";
 
@@ -17,25 +19,83 @@ function App() {
     () => localStorage.getItem("studyBloomName") || ""
   );
 
-  const [nameInput, setNameInput] = useState("");
+  const [isAuthenticated, setIsAuthenticated] = useState(
+    () => Boolean(localStorage.getItem("studyBloomToken"))
+  );
+
+  const [authMode, setAuthMode] = useState("login");
+  const [usernameInput, setUsernameInput] = useState("");
+  const [passwordInput, setPasswordInput] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [authError, setAuthError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+
   const [activePage, setActivePage] = useState("Dashboard");
 
-  function handleNameSubmit(event) {
+  async function handleAuthSubmit(event) {
     event.preventDefault();
+    setAuthError("");
 
-    const cleanedName = nameInput.trim();
+    const username = usernameInput.trim().toLowerCase();
 
-    if (!cleanedName) return;
+    if (username.length < 3 || username.length > 30) {
+      setAuthError("Username must be between 3 and 30 characters.");
+      return;
+    }
 
-    localStorage.setItem("studyBloomName", cleanedName);
-    setName(cleanedName);
-    setActivePage("Dashboard");
+    if (!/^[a-z0-9_]+$/.test(username)) {
+      setAuthError(
+        "Use only lowercase letters, numbers, and underscores in your username."
+      );
+      return;
+    }
+
+    if (passwordInput.length < 8 || passwordInput.length > 72) {
+      setAuthError("Password must be between 8 and 72 characters.");
+      return;
+    }
+
+    if (
+      authMode === "register" &&
+      passwordInput !== confirmPassword
+    ) {
+      setAuthError("The passwords do not match.");
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const result =
+        authMode === "register"
+          ? await register(username, passwordInput)
+          : await login(username, passwordInput);
+
+      const accountName = result.user?.username || username;
+
+      localStorage.setItem("studyBloomName", accountName);
+      setName(accountName);
+      setIsAuthenticated(true);
+      setUsernameInput("");
+      setPasswordInput("");
+      setConfirmPassword("");
+      setActivePage("Dashboard");
+    } catch (error) {
+      setAuthError(error.message || "Authentication failed. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   function handleLogout() {
-    localStorage.removeItem("studyBloomName");
+    logout();
     setName("");
-    setNameInput("");
+    setIsAuthenticated(false);
+    setUsernameInput("");
+    setPasswordInput("");
+    setConfirmPassword("");
+    setAuthError("");
+    setAuthMode("login");
     setActivePage("Dashboard");
   }
 
@@ -48,7 +108,7 @@ function App() {
     setName(cleanedName);
   }
 
-  if (!name) {
+  if (!isAuthenticated || !name) {
     return (
       <main className="welcome-page">
         <section className="welcome-card">
@@ -63,27 +123,139 @@ function App() {
             and make room for yourself.
           </p>
 
-          <form onSubmit={handleNameSubmit} className="welcome-form">
-            <label htmlFor="studentName">
-              What should we call you?
-            </label>
+          <div
+            className="auth-switch"
+            style={{
+              display: "flex",
+              gap: "10px",
+              marginBottom: "22px"
+            }}
+          >
+            <button
+              type="button"
+              className="primary-button"
+              onClick={() => {
+                setAuthMode("login");
+                setAuthError("");
+              }}
+              disabled={isLoading}
+              style={{
+                flex: 1,
+                opacity: authMode === "login" ? 1 : 0.65
+              }}
+            >
+              Log in
+            </button>
+
+            <button
+              type="button"
+              className="primary-button"
+              onClick={() => {
+                setAuthMode("register");
+                setAuthError("");
+              }}
+              disabled={isLoading}
+              style={{
+                flex: 1,
+                opacity: authMode === "register" ? 1 : 0.65
+              }}
+            >
+              Create account
+            </button>
+          </div>
+
+          <form onSubmit={handleAuthSubmit} className="welcome-form">
+            <label htmlFor="studentUsername">Username</label>
 
             <input
-              id="studentName"
-              value={nameInput}
-              onChange={(event) => setNameInput(event.target.value)}
-              placeholder="Enter your name"
-              maxLength={50}
+              id="studentUsername"
+              value={usernameInput}
+              onChange={(event) =>
+                setUsernameInput(event.target.value)
+              }
+              placeholder="Choose a username"
+              minLength={3}
+              maxLength={30}
+              autoComplete="username"
               required
+              disabled={isLoading}
             />
 
-            <button type="submit" className="primary-button">
-              Let's get started <span>→</span>
+            <label htmlFor="studentPassword">Password</label>
+
+            <input
+              id="studentPassword"
+              type="password"
+              value={passwordInput}
+              onChange={(event) =>
+                setPasswordInput(event.target.value)
+              }
+              placeholder="Enter your password"
+              minLength={8}
+              maxLength={72}
+              autoComplete={
+                authMode === "login"
+                  ? "current-password"
+                  : "new-password"
+              }
+              required
+              disabled={isLoading}
+            />
+
+            {authMode === "register" && (
+              <>
+                <label htmlFor="confirmPassword">
+                  Confirm password
+                </label>
+
+                <input
+                  id="confirmPassword"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(event) =>
+                    setConfirmPassword(event.target.value)
+                  }
+                  placeholder="Enter your password again"
+                  minLength={8}
+                  maxLength={72}
+                  autoComplete="new-password"
+                  required
+                  disabled={isLoading}
+                />
+              </>
+            )}
+
+            {authError && (
+              <p
+                role="alert"
+                style={{
+                  color: "#b42318",
+                  fontSize: "0.9rem",
+                  marginTop: "12px"
+                }}
+              >
+                {authError}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              className="primary-button"
+              disabled={isLoading}
+            >
+              {isLoading
+                ? "Please wait..."
+                : authMode === "login"
+                  ? "Log in"
+                  : "Create account"}
+              {!isLoading && <span> →</span>}
             </button>
           </form>
 
           <p className="welcome-note">
-            Small steps count. You've got this!
+            {authMode === "login"
+              ? "Welcome back! Keep growing, one step at a time."
+              : "Your own little study space starts here."}
           </p>
         </section>
       </main>

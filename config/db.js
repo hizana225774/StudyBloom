@@ -1,6 +1,5 @@
 
-
-import mongoose from "mongoose";
+const mongoose = require("mongoose");
 
 let connectionPromise = null;
 
@@ -22,4 +21,4 @@ async function connectDB() {
   console.log("MongoDB Atlas connected successfully!");
 }
 
-export default connectDB;
+module.exports = connectDB;

@@ -1,13 +1,16 @@
 
 const Settings = require("../models/Settings");
 
-// Get user settings
+// Get settings for the logged-in user
 exports.getSettings = async (req, res) => {
   try {
-    let settings = await Settings.findOne();
+    let settings = await Settings.findOne({
+      user: req.user.id
+    });
 
     if (!settings) {
       settings = await Settings.create({
+        user: req.user.id,
         name: "",
         theme: "sage",
         notifications: true
@@ -20,7 +23,7 @@ exports.getSettings = async (req, res) => {
   }
 };
 
-// Update user settings
+// Update settings for the logged-in user
 exports.updateSettings = async (req, res) => {
   try {
     const allowedFields = ["name", "theme", "notifications"];
@@ -33,8 +36,11 @@ exports.updateSettings = async (req, res) => {
     }
 
     const settings = await Settings.findOneAndUpdate(
-      {},
-      { $set: updates },
+      { user: req.user.id },
+      {
+        $set: updates,
+        $setOnInsert: { user: req.user.id }
+      },
       {
         new: true,
         upsert: true,

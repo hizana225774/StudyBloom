@@ -5,7 +5,8 @@ const express = require("express");
 const cors = require("cors");
 const connectDB = require("./config/db");
 
-// Import all route files
+// Import routes
+const authRoutes = require("./routes/authRoutes");
 const taskRoutes = require("./routes/taskRoutes");
 const eventRoutes = require("./routes/eventRoutes");
 const timetableRoutes = require("./routes/timetableRoutes");
@@ -27,7 +28,10 @@ app.get("/", (req, res) => {
   });
 });
 
-// API routes
+// Public authentication routes
+app.use("/api/auth", authRoutes);
+
+// Protected feature routes
 app.use("/api/tasks", taskRoutes);
 app.use("/api/events", eventRoutes);
 app.use("/api/timetable", timetableRoutes);
@@ -41,15 +45,17 @@ app.use((req, res) => {
   });
 });
 
-// Connect to MongoDB and start the server
+// Connect to MongoDB and start server
 async function startServer() {
   try {
+    if (!process.env.JWT_SECRET) {
+      throw new Error("JWT_SECRET is missing from the environment.");
+    }
+
     await connectDB();
 
     app.listen(PORT, () => {
-      console.log(
-        `StudyBloom server running at http://localhost:${PORT}`
-      );
+      console.log(`StudyBloom server running at http://localhost:${PORT}`);
     });
   } catch (error) {
     console.error("Could not start StudyBloom:", error.message);
@@ -58,4 +64,3 @@ async function startServer() {
 }
 
 startServer();
-

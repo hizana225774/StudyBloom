@@ -1,12 +1,20 @@
 
 const API_URL = "https://studybloom-9d70.onrender.com/api";
 
+// Get the saved authentication token
+function getToken() {
+  return localStorage.getItem("studyBloomToken");
+}
+
 // Common function for communicating with the backend
 async function request(endpoint, options = {}) {
+  const token = getToken();
+
   const response = await fetch(`${API_URL}${endpoint}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options.headers,
     },
   });
@@ -20,6 +28,46 @@ async function request(endpoint, options = {}) {
   }
 
   return data;
+}
+
+// AUTHENTICATION
+export async function register(username, password) {
+  const data = await request("/auth/register", {
+    method: "POST",
+    body: JSON.stringify({ username, password }),
+  });
+
+  if (data.token) {
+    localStorage.setItem("studyBloomToken", data.token);
+  }
+
+  if (data.user?.username) {
+    localStorage.setItem("studyBloomName", data.user.username);
+  }
+
+  return data;
+}
+
+export async function login(username, password) {
+  const data = await request("/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ username, password }),
+  });
+
+  if (data.token) {
+    localStorage.setItem("studyBloomToken", data.token);
+  }
+
+  if (data.user?.username) {
+    localStorage.setItem("studyBloomName", data.user.username);
+  }
+
+  return data;
+}
+
+export function logout() {
+  localStorage.removeItem("studyBloomToken");
+  localStorage.removeItem("studyBloomName");
 }
 
 // TASKS
